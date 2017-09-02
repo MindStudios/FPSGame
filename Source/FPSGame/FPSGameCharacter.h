@@ -65,6 +65,10 @@ public:
 	FVector GunOffset;
 
 	/** Projectile class to spawn */
+	UPROPERTY(EditDefaultsOnly, Category = Projectile)
+	TSubclassOf<class AGun> GunBlueprint;
+
+	/** Projectile class to spawn */
 	UPROPERTY(EditDefaultsOnly, Category=Projectile)
 	TSubclassOf<class AFPSGameProjectile> ProjectileClass;
 
@@ -80,6 +84,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = Gameplay)
 	uint32 bUsingMotionControllers : 1;
 
+private:
+	AGun* Gun;
+
 protected:
 	
 	/** Fires a projectile. */
@@ -91,7 +98,7 @@ protected:
 	/** Handles moving forward/backward */
 	void MoveForward(float Val);
 
-	/** Handles stafing movement, left and right */
+	/** Handles strafing movement, left and right */
 	void MoveRight(float Val);
 
 	/**
