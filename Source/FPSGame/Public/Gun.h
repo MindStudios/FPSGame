@@ -39,6 +39,7 @@ public:
 	UPROPERTY(VisibleDefaultsOnly, Category = Gameplay)
 	class UAnimInstance* AnimInstance;
 
+	UFUNCTION(BlueprintCallable, Category = Gameplay)
 	void OnFire();
 
 protected:
