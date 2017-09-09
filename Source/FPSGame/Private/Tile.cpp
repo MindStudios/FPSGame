@@ -1,6 +1,9 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "Tile.h"
+#include "DrawDebugHelpers.h"
+#include "ActorPool.h"
+#include "Runtime/Engine/Classes/AI/Navigation/NavigationSystem.h"
 
 
 // Sets default values
@@ -17,6 +20,14 @@ void ATile::BeginPlay()
 	Super::BeginPlay();
 }
 
+void ATile::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	Super::EndPlay(EndPlayReason);
+	if (NavMeshBoundsVolumePool != nullptr && NavMeshBoundsVolume != nullptr) {
+		NavMeshBoundsVolumePool->Return(NavMeshBoundsVolume);
+	}
+}
+
 // Called every frame
 void ATile::Tick(float DeltaTime)
 {
@@ -24,11 +35,9 @@ void ATile::Tick(float DeltaTime)
 
 }
 
-void ATile::PlaceActors(TSubclassOf<AActor> ToSpawn, int32 MinSpawn, int32 MaxSpawn, float MinScale, float MaxScale, float Radius)
-{
-	FVector MinBounds = FVector(0, -2000, 100);
-	FVector MaxBounds = FVector(4000, 2000, 100);
 
+void ATile::PlaceActors(TSubclassOf<AActor> ToSpawn, int32 MinSpawn, int32 MaxSpawn, float MinScale, float MaxScale, float Radius) //TODO function template specialization and polymorphism
+{
 	FBox BoxBounds = FBox(MinBounds, MaxBounds);
 	FVector SpawnPoint = FMath::RandPointInBox(BoxBounds);
 
@@ -47,6 +56,40 @@ void ATile::PlaceActors(TSubclassOf<AActor> ToSpawn, int32 MinSpawn, int32 MaxSp
 
 			Spawned->SetActorRotation(FRotator(0, FMath::RandRange(-180, 180), 0));
 			Spawned->SetActorScale3D(Spawned->GetActorScale() * FMath::RandRange(MinScale, MaxScale));
+
+			TotalCasts++;
+			TotalAttempts = 0;
+		}
+		else {
+			TotalAttempts++;
+		}
+		if (TotalAttempts > 50) break;
+	}
+}
+
+void ATile::PlaceAIPawns(TSubclassOf<APawn> ToSpawn, int32 MinSpawn, int32 MaxSpawn, float Radius)
+{
+	FBox BoxBounds = FBox(MinBounds, MaxBounds);
+	FVector SpawnPoint = FMath::RandPointInBox(BoxBounds);
+
+	int32 TotalObjects = FMath::RandRange(MinSpawn, MaxSpawn);
+	int32 TotalCasts = 0;
+	int32 TotalAttempts = 0;
+
+	// Attempt to spawn without hitting other actors
+	while (TotalCasts < TotalObjects)
+	{
+		FVector SpawnPoint = FMath::RandPointInBox(BoxBounds);
+		if (CanSpawnAtLocation(SpawnPoint, Radius)) {
+			APawn* Pawn = GetWorld()->SpawnActor<APawn>(ToSpawn);
+			if (Pawn == nullptr) return;
+
+			Pawn->SpawnDefaultController();
+			Pawn->Tags.Push(FName("Enemy"));
+			Pawn->SetActorRelativeLocation(SpawnPoint);
+			Pawn->AttachToActor(this, FAttachmentTransformRules(EAttachmentRule::KeepRelative, false));
+
+			Pawn->SetActorRotation(FRotator(0, FMath::RandRange(-180, 180), 0));
 
 			TotalCasts++;
 			TotalAttempts = 0;
@@ -78,4 +121,27 @@ bool ATile::CanSpawnAtLocation(FVector Location, float Radius)
 	//DrawDebugCapsule(GetWorld(), Location, 0, Radius, FQuat::Identity, ResultColor, true, 100);
 
 	return !HasHit;
+}
+
+void ATile::SetPool(UActorPool * Pool)
+{
+	NavMeshBoundsVolumePool = Pool;
+	PositionNavMeshBoundsVolume(Pool);
+}
+
+void ATile::PositionNavMeshBoundsVolume(UActorPool * Pool)
+{
+	NavMeshBoundsVolume = Pool->Checkout();
+	if (NavMeshBoundsVolume == nullptr) {
+		UE_LOG(LogTemp, Error, TEXT("Not enough actors in pool."));
+		return;
+	}
+
+	NavMeshBoundsVolume->SetActorLocation(GetActorLocation() + NavBoundsOffset);
+	GetWorld()->GetNavigationSystem()->Build();
+}
+
+UActorPool * ATile::GetPool()
+{
+	return NavMeshBoundsVolumePool;
 }
